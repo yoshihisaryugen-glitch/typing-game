@@ -15,7 +15,7 @@
     {
       id: "japanese",
       label: "日本語の単語",
-      hint: "ひらがなと漢字",
+      hint: "ひらがなのまま入力",
     },
     {
       id: "english",
