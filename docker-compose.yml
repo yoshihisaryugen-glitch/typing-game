@@ -1,0 +1,5 @@
+services:
+  typing-game:
+    build: .
+    ports:
+      - "8080:80"

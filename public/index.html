@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>タイピング</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%23d84a32' width='32' height='32' rx='6'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' fill='white' font-family='sans-serif'%3ET%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <section id="screen-start" class="screen active">
+        <p class="eyebrow">Typing</p>
+        <h1>タイピング</h1>
+        <p class="lead">表示された文字列を、そのまま打つ。</p>
+        <ul class="tags">
+          <li>Pythonの単語と記号</li>
+          <li>記号</li>
+          <li>日本語の単語</li>
+          <li>英語の単語</li>
+        </ul>
+        <div class="actions">
+          <button id="btn-start" class="btn primary" type="button">スタート</button>
+          <button id="btn-settings" class="btn ghost" type="button">設定</button>
+        </div>
+      </section>
+
+      <section id="screen-settings" class="screen" hidden>
+        <p class="eyebrow">Frequency</p>
+        <h1>設定</h1>
+        <p class="lead">1 が最も少なく、5 が最も多く出ます。</p>
+        <div id="settings-list" class="settings-list"></div>
+        <div class="actions">
+          <button id="btn-settings-back" class="btn primary" type="button">戻る</button>
+          <button id="btn-settings-reset" class="btn ghost" type="button">初期値に戻す</button>
+        </div>
+      </section>
+
+      <section id="screen-game" class="screen stage" hidden>
+        <header class="hud" aria-label="成績">
+          <div><span>スコア</span><strong id="hud-score">0</strong></div>
+          <div><span>コンボ</span><strong id="hud-combo">0</strong></div>
+          <div><span>正確率</span><strong id="hud-acc">100%</strong></div>
+          <div><span>文字/分</span><strong id="hud-cpm">0</strong></div>
+          <div><span>時間</span><strong id="hud-time">00:00</strong></div>
+        </header>
+        <div class="stage-body">
+          <p id="category-label" class="category">Python</p>
+          <p id="prompt" class="prompt" aria-live="polite"></p>
+          <p id="gain" class="gain" aria-hidden="true"></p>
+          <label class="input-label" for="type-input">ここに入力</label>
+          <input
+            id="type-input"
+            class="type-input"
+            type="text"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            enterkeyhint="done"
+          />
+        </div>
+        <div class="stage-foot">
+          <button id="btn-end" class="btn ghost light" type="button">終了</button>
+        </div>
+      </section>
+
+      <section id="screen-result" class="screen" hidden>
+        <p class="eyebrow">Result</p>
+        <h1>結果</h1>
+        <dl class="result-grid">
+          <div><dt>スコア</dt><dd id="result-score">0</dd></div>
+          <div><dt>クリア</dt><dd id="result-cleared">0</dd></div>
+          <div><dt>正確率</dt><dd id="result-acc">100%</dd></div>
+          <div><dt>最大コンボ</dt><dd id="result-combo">0</dd></div>
+          <div><dt>文字/分</dt><dd id="result-cpm">0</dd></div>
+          <div><dt>時間</dt><dd id="result-time">00:00</dd></div>
+        </dl>
+        <div class="actions">
+          <button id="btn-retry" class="btn primary" type="button">もう一度</button>
+          <button id="btn-menu" class="btn ghost" type="button">メニューへ</button>
+        </div>
+      </section>
+    </div>
+    <script src="js/words.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
