@@ -22,6 +22,11 @@
       label: "英語の単語",
       hint: "日常で使う英単語",
     },
+    {
+      id: "number",
+      label: "数字",
+      hint: "0〜9の5桁",
+    },
   ];
 
   const DEFAULT_SETTINGS = {
@@ -29,6 +34,7 @@
     symbol: 3,
     japanese: 3,
     english: 3,
+    number: 3,
   };
 
   const screens = {
@@ -107,7 +113,7 @@
       if (!raw || typeof raw !== "object") return settings;
       for (const id of Object.keys(DEFAULT_SETTINGS)) {
         const value = Number(raw[id]);
-        if (Number.isInteger(value) && value >= 1 && value <= 5) settings[id] = value;
+        if (Number.isInteger(value) && value >= 0 && value <= 5) settings[id] = value;
       }
     } catch {
       return { ...DEFAULT_SETTINGS };
@@ -142,13 +148,13 @@
       levels.setAttribute("role", "group");
       levels.setAttribute("aria-label", `${category.label}の頻出度`);
 
-      for (let level = 1; level <= 5; level += 1) {
+      for (let level = 0; level <= 5; level += 1) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "level";
         button.textContent = String(level);
         const selected = state.settings[category.id];
-        button.classList.toggle("on", level <= selected);
+        button.classList.toggle("on", level > 0 && level <= selected);
         button.classList.toggle("picked", level === selected);
         button.setAttribute("aria-pressed", String(level === selected));
         button.addEventListener("click", () => {
@@ -165,6 +171,7 @@
   }
 
   function openSettings() {
+    document.querySelector("#start-notice").hidden = true;
     renderSettings();
     show("settings");
   }
@@ -180,6 +187,13 @@
   }
 
   function startGame() {
+    const notice = document.querySelector("#start-notice");
+    if (!CATEGORIES.some((category) => state.settings[category.id] > 0)) {
+      notice.hidden = false;
+      return;
+    }
+    notice.hidden = true;
+
     clearInterval(state.timerId);
     state.timerId = null;
     state.score = 0;
@@ -218,25 +232,47 @@
 
   function pickEntry() {
     const total = CATEGORIES.reduce((sum, category) => sum + state.settings[category.id], 0);
+    if (total <= 0) return null;
     let roll = Math.random() * total;
-    let chosen = CATEGORIES[0].id;
+    let chosen = null;
     for (const category of CATEGORIES) {
+      if (state.settings[category.id] <= 0) continue;
       roll -= state.settings[category.id];
       if (roll < 0) {
         chosen = category.id;
         break;
       }
     }
+    if (!chosen) {
+      chosen = CATEGORIES.find((category) => state.settings[category.id] > 0).id;
+    }
 
-    const bank = window.WORD_BANK[chosen];
-    let text = bank[Math.floor(Math.random() * bank.length)];
+    let text;
     let guard = 0;
-    while (text === state.lastText && bank.length > 1 && guard < 8) {
+    if (chosen === "number") {
+      text = randomNumber();
+      while (text === state.lastText && guard < 8) {
+        text = randomNumber();
+        guard += 1;
+      }
+    } else {
+      const bank = window.WORD_BANK[chosen];
       text = bank[Math.floor(Math.random() * bank.length)];
-      guard += 1;
+      while (text === state.lastText && bank.length > 1 && guard < 8) {
+        text = bank[Math.floor(Math.random() * bank.length)];
+        guard += 1;
+      }
     }
     state.lastText = text;
     return { category: chosen, text };
+  }
+
+  function randomNumber() {
+    let text = "";
+    for (let i = 0; i < 5; i += 1) {
+      text += String(Math.floor(Math.random() * 10));
+    }
+    return text;
   }
 
   function onConfirmedInput() {
@@ -340,6 +376,7 @@
     });
 
     input.lang = state.current?.category === "japanese" ? "ja" : "en";
+    input.inputMode = state.current?.category === "number" ? "numeric" : "text";
     input.setAttribute("aria-label", `${category ? category.label : "問題"}: ${target}`);
   }
 

@@ -186,7 +186,14 @@ h1 {
 
 .levels {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.notice {
+  margin: 0;
+  color: var(--seal);
+  font-size: 0.95rem;
 }
 
 .level {

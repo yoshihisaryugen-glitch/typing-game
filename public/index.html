@@ -13,11 +13,13 @@
         <p class="eyebrow">Typing</p>
         <h1>タイピング</h1>
         <p class="lead">表示された文字列を、そのまま打つ。</p>
+        <p id="start-notice" class="notice" hidden>どれか1つは1以上にしてください。</p>
         <ul class="tags">
           <li>Pythonの単語と記号</li>
           <li>記号</li>
           <li>日本語の単語</li>
           <li>英語の単語</li>
+          <li>数字</li>
         </ul>
         <div class="actions">
           <button id="btn-start" class="btn primary" type="button">スタート</button>
@@ -28,7 +30,7 @@
       <section id="screen-settings" class="screen" hidden>
         <p class="eyebrow">Frequency</p>
         <h1>設定</h1>
-        <p class="lead">1 が最も少なく、5 が最も多く出ます。</p>
+        <p class="lead">0 にすると出ません。5 が最も多く出ます。</p>
         <div id="settings-list" class="settings-list"></div>
         <div class="actions">
           <button id="btn-settings-back" class="btn primary" type="button">戻る</button>
