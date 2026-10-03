@@ -65,6 +65,7 @@
     timerId: null,
     prevConfirmed: "",
     acceptedText: null,
+    editGeneration: 0,
     composing: false,
     playing: false,
   };
@@ -187,6 +188,7 @@
   }
 
   function startGame() {
+    state.editGeneration += 1;
     const notice = document.querySelector("#start-notice");
     if (!CATEGORIES.some((category) => state.settings[category.id] > 0)) {
       notice.hidden = false;
@@ -210,6 +212,7 @@
     state.current = pickEntry();
     input.value = "";
     show("game");
+    applyInputMode();
     renderPrompt();
     updateHud();
     input.focus();
@@ -279,17 +282,7 @@
     if (!state.playing || !state.current) return;
     const typed = input.value;
     if (state.acceptedText !== null) {
-      if (typed === state.acceptedText) {
-        input.value = "";
-        state.prevConfirmed = "";
-        renderPrompt();
-        return;
-      }
-      if (typed === "") {
-        state.prevConfirmed = "";
-        state.acceptedText = null;
-        return;
-      }
+      if (typed === state.acceptedText) return;
       state.acceptedText = null;
     }
     if (typed === state.prevConfirmed) return;
@@ -300,13 +293,35 @@
     renderPrompt();
     updateHud();
 
-    if (missed) {
-      input.classList.remove("shake");
-      void input.offsetWidth;
-      input.classList.add("shake");
-    }
+    if (missed) scheduleShake();
 
     if (typed === state.current.text) succeed();
+  }
+
+  function deferClear(expected) {
+    const generation = ++state.editGeneration;
+    setTimeout(() => {
+      if (!state.playing || state.editGeneration !== generation) return;
+      if (input.value === expected) {
+        input.value = "";
+        state.prevConfirmed = "";
+      }
+      state.acceptedText = null;
+      applyInputMode();
+      renderPrompt();
+      if (document.activeElement !== input) input.focus();
+    }, 0);
+  }
+
+  function scheduleShake() {
+    requestAnimationFrame(() => {
+      if (!state.playing) return;
+      input.classList.remove("shake");
+      requestAnimationFrame(() => {
+        if (!state.playing) return;
+        input.classList.add("shake");
+      });
+    });
   }
 
   function registerTypos(prev, next, target) {
@@ -329,7 +344,6 @@
 
   function succeed() {
     const chars = Array.from(state.current.text).length;
-    state.acceptedText = state.current.text;
     state.combo += 1;
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.cleared += 1;
@@ -337,12 +351,12 @@
     const gain = chars * 10 + (state.combo - 1) * 5;
     state.score += gain;
     showGain(gain);
+    const finished = state.current.text;
+    state.acceptedText = finished;
     state.current = pickEntry();
     state.prevConfirmed = "";
-    input.value = "";
-    renderPrompt();
     updateHud();
-    input.focus();
+    deferClear(finished);
   }
 
   function renderPrompt() {
@@ -375,9 +389,13 @@
       promptEl.append(span);
     });
 
-    input.lang = state.current?.category === "japanese" ? "ja" : "en";
-    input.inputMode = state.current?.category === "number" ? "numeric" : "text";
     input.setAttribute("aria-label", `${category ? category.label : "問題"}: ${target}`);
+  }
+
+  function applyInputMode() {
+    const category = state.current?.category;
+    input.lang = category === "japanese" ? "ja" : "en";
+    input.inputMode = category === "number" ? "numeric" : "text";
   }
 
   function showGain(gain) {

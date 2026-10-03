@@ -331,7 +331,7 @@ h1 {
 }
 
 .type-input.shake {
-  animation: shake 280ms ease;
+  animation: miss-flash 280ms ease;
 }
 
 .gain {
@@ -365,16 +365,13 @@ h1 {
   }
 }
 
-@keyframes shake {
+@keyframes miss-flash {
   0%,
   100% {
-    transform: translateX(0);
+    border-bottom-color: rgba(255, 255, 255, 0.28);
   }
-  25% {
-    transform: translateX(-6px);
-  }
-  75% {
-    transform: translateX(6px);
+  40% {
+    border-bottom-color: var(--bad);
   }
 }
 
