@@ -68,14 +68,20 @@
     editGeneration: 0,
     composing: false,
     playing: false,
+    focusMode: false,
+    focusWeights: null,
+    charStats: {},
+    sessionStats: {},
+    charClock: null,
   };
 
-  document.querySelector("#btn-start").addEventListener("click", startGame);
+  document.querySelector("#btn-start").addEventListener("click", () => startGame(false));
   document.querySelector("#btn-settings").addEventListener("click", openSettings);
   document.querySelector("#btn-settings-back").addEventListener("click", () => show("start"));
   document.querySelector("#btn-settings-reset").addEventListener("click", resetSettings);
   document.querySelector("#btn-end").addEventListener("click", finishGame);
-  document.querySelector("#btn-retry").addEventListener("click", startGame);
+  document.querySelector("#btn-retry").addEventListener("click", () => startGame(false));
+  document.querySelector("#btn-focus").addEventListener("click", startFocusGame);
   document.querySelector("#btn-menu").addEventListener("click", () => show("start"));
 
   input.addEventListener("compositionstart", () => {
@@ -108,7 +114,7 @@
   renderSettings();
 
   function loadSettings() {
-    const settings = { ...DEFAULT_SETTINGS };
+    const settings = { ...DEFAULT_SETTINGS, custom: "" };
     try {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
       if (!raw || typeof raw !== "object") return settings;
@@ -116,8 +122,9 @@
         const value = Number(raw[id]);
         if (Number.isInteger(value) && value >= 0 && value <= 5) settings[id] = value;
       }
+      if (typeof raw.custom === "string") settings.custom = raw.custom;
     } catch {
-      return { ...DEFAULT_SETTINGS };
+      return { ...DEFAULT_SETTINGS, custom: "" };
     }
     return settings;
   }
@@ -127,9 +134,24 @@
   }
 
   function resetSettings() {
-    state.settings = { ...DEFAULT_SETTINGS };
+    state.settings = { ...DEFAULT_SETTINGS, custom: "" };
     saveSettings();
     renderSettings();
+  }
+
+  function customEntries() {
+    return String(state.settings.custom || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+  }
+
+  function customWeight() {
+    return customEntries().length > 0 ? 3 : 0;
+  }
+
+  function canStart() {
+    return CATEGORIES.some((category) => state.settings[category.id] > 0) || customEntries().length > 0;
   }
 
   function renderSettings() {
@@ -169,6 +191,30 @@
       row.append(title, hint, levels);
       settingsList.append(row);
     }
+
+    const customRow = document.createElement("article");
+    customRow.className = "setting-row";
+
+    const customTitle = document.createElement("h2");
+    customTitle.textContent = "カスタム";
+
+    const customHint = document.createElement("p");
+    customHint.textContent = "1行につき1問。頻度をすべて0にしても、ここにあれば出題されます。";
+
+    const customField = document.createElement("textarea");
+    customField.className = "custom-field";
+    customField.rows = 5;
+    customField.spellcheck = false;
+    customField.placeholder = "例）\n!=\nこんにちは";
+    customField.value = state.settings.custom || "";
+    customField.setAttribute("aria-label", "カスタムの出題");
+    customField.addEventListener("input", () => {
+      state.settings.custom = customField.value;
+      saveSettings();
+    });
+
+    customRow.append(customTitle, customHint, customField);
+    settingsList.append(customRow);
   }
 
   function openSettings() {
@@ -187,11 +233,16 @@
     if (name !== "game") input.blur();
   }
 
-  function startGame() {
+  function startGame(focus = false) {
     state.editGeneration += 1;
     const notice = document.querySelector("#start-notice");
-    if (!CATEGORIES.some((category) => state.settings[category.id] > 0)) {
+    if (!canStart()) {
       notice.hidden = false;
+      if (screens.result.classList.contains("active")) {
+        const resultNotice = document.querySelector("#result-notice");
+        resultNotice.hidden = false;
+        resultNotice.textContent = "設定で、どれか1つは1以上にするか、カスタムに文字を入力してください。";
+      }
       return;
     }
     notice.hidden = true;
@@ -209,6 +260,10 @@
     state.lastText = "";
     state.prevConfirmed = "";
     state.acceptedText = null;
+    state.charStats = {};
+    state.charClock = performance.now();
+    state.focusMode = Boolean(focus);
+    if (!focus) state.focusWeights = null;
     state.current = pickEntry();
     input.value = "";
     show("game");
@@ -216,6 +271,19 @@
     renderPrompt();
     updateHud();
     input.focus();
+  }
+
+  function startFocusGame() {
+    const weights = buildWeakWeights(state.sessionStats);
+    const notice = document.querySelector("#result-notice");
+    if (weights.size === 0) {
+      notice.hidden = false;
+      notice.textContent = "この回では、苦手な文字がまだありません。";
+      return;
+    }
+    notice.hidden = true;
+    state.focusWeights = weights;
+    startGame(true);
   }
 
   function finishGame() {
@@ -230,12 +298,21 @@
     document.querySelector("#result-combo").textContent = String(state.maxCombo);
     document.querySelector("#result-cpm").textContent = String(cpm());
     document.querySelector("#result-time").textContent = formatTime(elapsedMs());
+    state.sessionStats = snapshotStats(state.charStats);
+    document.querySelector("#result-notice").hidden = true;
     show("result");
   }
 
   function pickEntry() {
-    const total = CATEGORIES.reduce((sum, category) => sum + state.settings[category.id], 0);
+    const extra = customWeight();
+    const total = CATEGORIES.reduce((sum, category) => sum + state.settings[category.id], 0) + extra;
     if (total <= 0) return null;
+
+    if (state.focusMode && state.focusWeights && state.focusWeights.size > 0) {
+      const focused = pickFocusEntry();
+      if (focused) return focused;
+    }
+
     let roll = Math.random() * total;
     let chosen = null;
     for (const category of CATEGORIES) {
@@ -246,13 +323,22 @@
         break;
       }
     }
+    if (!chosen && extra > 0) chosen = "custom";
     if (!chosen) {
-      chosen = CATEGORIES.find((category) => state.settings[category.id] > 0).id;
+      const fallback = CATEGORIES.find((category) => state.settings[category.id] > 0);
+      chosen = fallback ? fallback.id : "custom";
     }
 
     let text;
     let guard = 0;
-    if (chosen === "number") {
+    if (chosen === "custom") {
+      const bank = customEntries();
+      text = bank[Math.floor(Math.random() * bank.length)];
+      while (text === state.lastText && bank.length > 1 && guard < 8) {
+        text = bank[Math.floor(Math.random() * bank.length)];
+        guard += 1;
+      }
+    } else if (chosen === "number") {
       text = randomNumber();
       while (text === state.lastText && guard < 8) {
         text = randomNumber();
@@ -278,6 +364,129 @@
     return text;
   }
 
+  function pickFocusEntry() {
+    const pool = [];
+    for (const category of CATEGORIES) {
+      if (state.settings[category.id] <= 0) continue;
+      const texts = category.id === "number" ? focusedNumbers() : window.WORD_BANK[category.id];
+      for (const text of texts) {
+        const score = scoreText(text);
+        if (score > 0) pool.push({ category: category.id, text, score });
+      }
+    }
+    for (const text of customEntries()) {
+      const score = scoreText(text);
+      if (score > 0) pool.push({ category: "custom", text, score });
+    }
+    if (pool.length === 0) return null;
+
+    let choice = null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      choice = weightedPick(pool);
+      if (choice.text !== state.lastText || pool.length === 1) break;
+    }
+    state.lastText = choice.text;
+    return { category: choice.category, text: choice.text };
+  }
+
+  function focusedNumbers() {
+    const digits = [...state.focusWeights.keys()].filter((ch) => ch >= "0" && ch <= "9");
+    const samples = [];
+    for (let sample = 0; sample < 36; sample += 1) {
+      let text = "";
+      for (let i = 0; i < 5; i += 1) {
+        if (digits.length > 0 && Math.random() < 0.75) {
+          text += digits[Math.floor(Math.random() * digits.length)];
+        } else {
+          text += String(Math.floor(Math.random() * 10));
+        }
+      }
+      samples.push(text);
+    }
+    return samples;
+  }
+
+  function scoreText(text) {
+    let score = 0;
+    for (const ch of Array.from(text)) {
+      const weight = state.focusWeights.get(ch) || 0;
+      if (weight > 0) score += weight;
+    }
+    return score;
+  }
+
+  function weightedPick(pool) {
+    const total = pool.reduce((sum, item) => sum + item.score, 0);
+    let roll = Math.random() * total;
+    for (const item of pool) {
+      roll -= item.score;
+      if (roll < 0) return item;
+    }
+    return pool[pool.length - 1];
+  }
+
+  function snapshotStats(stats) {
+    const copy = {};
+    for (const [ch, stat] of Object.entries(stats)) {
+      copy[ch] = { misses: stat.misses, count: stat.count, totalTime: stat.totalTime };
+    }
+    return copy;
+  }
+
+  function statFor(ch) {
+    if (!state.charStats[ch]) state.charStats[ch] = { misses: 0, count: 0, totalTime: 0 };
+    return state.charStats[ch];
+  }
+
+  function buildWeakWeights(stats) {
+    const entries = Object.entries(stats).filter(([, stat]) => stat.misses > 0 || stat.count > 0);
+    const averages = entries
+      .filter(([, stat]) => stat.count > 0)
+      .map(([, stat]) => stat.totalTime / stat.count)
+      .sort((a, b) => a - b);
+    const median = averages[Math.floor(averages.length / 2)] || 0;
+    const slowLine = Math.max(median * 1.5, 700);
+    const weights = [];
+    for (const [ch, stat] of entries) {
+      const average = stat.count > 0 ? stat.totalTime / stat.count : 0;
+      let weight = stat.misses * 4;
+      if (stat.count > 0 && average >= slowLine) weight += average / Math.max(slowLine, 1);
+      if (weight > 0) weights.push([ch, weight]);
+    }
+    weights.sort((a, b) => b[1] - a[1]);
+    return new Map(weights.slice(0, 10));
+  }
+
+  function recordTiming(prev, next, target) {
+    const targetChars = Array.from(target);
+    const prevMatch = prefixLength(Array.from(prev), targetChars);
+    const nextChars = Array.from(next);
+    const nextMatch = prefixLength(nextChars, targetChars);
+    const now = performance.now();
+    if (!state.charClock) state.charClock = now;
+
+    if (nextMatch > prevMatch) {
+      const added = nextMatch - prevMatch;
+      const elapsed = Math.max(0, now - state.charClock) / added;
+      for (let i = prevMatch; i < nextMatch; i += 1) {
+        const stat = statFor(targetChars[i]);
+        stat.count += 1;
+        stat.totalTime += elapsed;
+      }
+      state.charClock = now;
+    } else if (nextMatch < prevMatch) {
+      state.charClock = now;
+    }
+  }
+
+  function prefixLength(typedChars, targetChars) {
+    let index = 0;
+    while (index < typedChars.length && index < targetChars.length && typedChars[index] === targetChars[index]) {
+      index += 1;
+    }
+    return index;
+  }
+
   function onConfirmedInput() {
     if (!state.playing || !state.current) return;
     const typed = input.value;
@@ -288,6 +497,7 @@
     if (typed === state.prevConfirmed) return;
 
     ensureTimer();
+    recordTiming(state.prevConfirmed, typed, state.current.text);
     const missed = registerTypos(state.prevConfirmed, typed, state.current.text);
     state.prevConfirmed = typed;
     renderPrompt();
@@ -307,6 +517,7 @@
         state.prevConfirmed = "";
       }
       state.acceptedText = null;
+      state.charClock = performance.now();
       applyInputMode();
       renderPrompt();
       if (document.activeElement !== input) input.focus();
@@ -336,6 +547,7 @@
       if (changed && nextChars[i] !== targetChars[i]) {
         state.typos += 1;
         missed = true;
+        if (targetChars[i]) statFor(targetChars[i]).misses += 1;
       }
     }
     if (missed) state.combo = 0;
@@ -365,8 +577,10 @@
     const targetChars = Array.from(target);
     const typedChars = Array.from(typed);
     const category = CATEGORIES.find((item) => item.id === state.current?.category);
+    const label = state.current?.category === "custom" ? "カスタム" : category?.label;
 
-    categoryEl.textContent = category ? category.label : "";
+    categoryEl.textContent = label || "";
+    updateFocusLabel();
     promptEl.classList.toggle("long", targetChars.length > 18);
     promptEl.replaceChildren();
 
@@ -389,12 +603,26 @@
       promptEl.append(span);
     });
 
-    input.setAttribute("aria-label", `${category ? category.label : "問題"}: ${target}`);
+    input.setAttribute("aria-label", `${label || "問題"}: ${target}`);
+  }
+
+  function updateFocusLabel() {
+    const label = document.querySelector("#focus-label");
+    if (!state.focusMode || !state.focusWeights || state.focusWeights.size === 0) {
+      label.hidden = true;
+      label.textContent = "";
+      return;
+    }
+    const chars = [...state.focusWeights.keys()];
+    label.hidden = false;
+    label.textContent = `苦手な文字: ${chars.join(" ")}`;
   }
 
   function applyInputMode() {
     const category = state.current?.category;
-    input.lang = category === "japanese" ? "ja" : "en";
+    const text = state.current?.text || "";
+    const japanese = category === "japanese" || (category === "custom" && /[\u3040-\u30ff\u4e00-\u9fff]/.test(text));
+    input.lang = japanese ? "ja" : "en";
     input.inputMode = category === "number" ? "numeric" : "text";
   }
 

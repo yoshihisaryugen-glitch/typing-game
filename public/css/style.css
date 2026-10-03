@@ -218,6 +218,19 @@ h1 {
   color: white;
 }
 
+.custom-field {
+  width: 100%;
+  min-height: 7.5rem;
+  resize: vertical;
+  border: 1px solid #d9cec0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.6;
+}
+
 .hud {
   width: 100%;
   display: grid;
@@ -282,6 +295,13 @@ h1 {
   color: var(--caret);
   letter-spacing: 0.08em;
   font-size: 0.85rem;
+}
+
+.focus-label {
+  margin: 0;
+  color: var(--stage-muted);
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
 }
 
 .prompt {

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>タイピング</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%23d84a32' width='32' height='32' rx='6'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' fill='white' font-family='sans-serif'%3ET%3C/text%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="css/style.css?v=2" />
+    <link rel="stylesheet" href="css/style.css?v=4" />
   </head>
   <body>
     <div class="app">
@@ -13,7 +13,7 @@
         <p class="eyebrow">Typing</p>
         <h1>タイピング</h1>
         <p class="lead">表示された文字列を、そのまま打つ。</p>
-        <p id="start-notice" class="notice" hidden>どれか1つは1以上にしてください。</p>
+        <p id="start-notice" class="notice" hidden>どれか1つは1以上にするか、カスタムに文字を入力してください。</p>
         <ul class="tags">
           <li>Pythonの単語と記号</li>
           <li>記号</li>
@@ -48,6 +48,7 @@
         </header>
         <div class="stage-body">
           <p id="category-label" class="category">Python</p>
+          <p id="focus-label" class="focus-label" hidden></p>
           <p id="prompt" class="prompt" aria-live="polite"></p>
           <p id="gain" class="gain" aria-hidden="true"></p>
           <label class="input-label" for="type-input">ここに入力</label>
@@ -78,13 +79,15 @@
           <div><dt>文字/分</dt><dd id="result-cpm">0</dd></div>
           <div><dt>時間</dt><dd id="result-time">00:00</dd></div>
         </dl>
+        <p id="result-notice" class="notice" hidden></p>
         <div class="actions">
           <button id="btn-retry" class="btn primary" type="button">もう一度</button>
+          <button id="btn-focus" class="btn ghost" type="button">苦手な文字にフォーカス</button>
           <button id="btn-menu" class="btn ghost" type="button">メニューへ</button>
         </div>
       </section>
     </div>
     <script src="js/words.js?v=2"></script>
-    <script src="js/app.js?v=3"></script>
+    <script src="js/app.js?v=5"></script>
   </body>
 </html>
